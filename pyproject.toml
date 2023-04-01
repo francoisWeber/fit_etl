@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "fit-etl"
+version = "0.1.0"
+description = ""
+authors = ["François Weber <f.weber@qwant.com>"]
+readme = "README.md"
+packages = [{include = "fit_etl"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fitdecode = "^0.10.0"
+numpy = "^1.24.2"
+pandas = "^1.5.3"
+ipykernel = "^6.22.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
