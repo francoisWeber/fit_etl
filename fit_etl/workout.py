@@ -1,4 +1,6 @@
+from typing import List
 from fit_etl.fidata import FitDataFrame
+from fit_etl.constants import *
 
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -38,3 +40,22 @@ class Workout:
         for start_time in self.laps.start_time:
             ax.axvline(x=start_time, linestyle="--", c="k")
         ax.set_title(f"Basics for {self.date}")
+
+    def get_every_breaks(self) -> List[pd.DataFrame]:
+        n_breaks = len(self.laps[self.laps.category == LAP_CATEGORY_BREAK])
+        return [
+            self.get_ith_lap_of_category(i, LAP_CATEGORY_BREAK) for i in range(n_breaks)
+        ]
+
+    def get_ith_lap_of_category(self, i, category):
+        try:
+            laps = self.laps[self.laps.category == category]
+        except pd.errors.IndexingError:
+            raise KeyError(f"No category {category} in laps")
+        try:
+            lap = laps.iloc[i]
+        except IndexError:
+            raise KeyError(f"Observation {i} out of range for {category=}")
+        return self.records.between_time(
+            start_time=lap.start_time.time(), end_time=lap.stop_time.time()
+        )

@@ -1,6 +1,8 @@
 import pandas as pd
-from fit_etl.utils import fields2row
 import numpy as np
+
+from fit_etl.utils import fields2row
+from fit_etl.constants import *
 
 
 class FitDataFrame:
@@ -37,13 +39,13 @@ class FitDataFrame:
     @staticmethod
     def _categorize_lap_serie(lap: pd.Series, last_lap_id: int):
         if lap.name == 0:
-            return "warm-up"
+            return LAP_CATEGORY_WARMUP
         elif lap.name == last_lap_id - 1:
-            return "warm-down"
+            return LAP_CATEGORY_WARMDOWN
         elif np.isclose(int(lap.total_distance), lap.total_distance, atol=1e-3):
-            return "run"
+            return LAP_CATEGORY_RUN
         elif np.isclose(int(lap.total_timer_time), lap.total_timer_time, atol=1e-1):
-            return "break"
+            return LAP_CATEGORY_BREAK
         else:
             return "unknown"
 
