@@ -1,6 +1,7 @@
 from typing import List
 from fit_etl.fidata import FitDataFrame
 from fit_etl.constants import *
+from fit_etl.fitfile import decode_fitfile
 
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -22,8 +23,18 @@ class Workout:
         self.records = records
 
     @classmethod
-    def from_json(clf, path_or_buf):
+    def from_fitjson(clf, path_or_buf):
         df = pd.read_json(path_or_buf=path_or_buf)
+        path = path_or_buf
+        date = FitDataFrame.extract_date(df)
+        laps = FitDataFrame.extract_laps(df)
+        session = FitDataFrame.extract_session(df)
+        records = FitDataFrame.extract_records(df)
+        return clf(path=path, date=date, laps=laps, session=session, records=records)
+
+    @classmethod
+    def from_fit(clf, path_or_buf):
+        df = pd.DataFrame(decode_fitfile(path_or_buf))
         path = path_or_buf
         date = FitDataFrame.extract_date(df)
         laps = FitDataFrame.extract_laps(df)
