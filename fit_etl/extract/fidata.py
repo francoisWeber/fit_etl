@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 
-from fit_etl.utils import fields2row
-from fit_etl.constants import *
+from fit_etl.tooling.utils import fields2row
+from fit_etl.tooling.constants import *
 
 
 class FitDataFrame:

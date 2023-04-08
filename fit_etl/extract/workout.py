@@ -1,14 +1,14 @@
 from typing import List
-from fit_etl.fidata import FitDataFrame
-from fit_etl.constants import *
-from fit_etl.fitfile import decode_fitfile
+from fit_etl.tooling.constants import *
+from fit_etl.extract.fidata import FitDataFrame
+from fit_etl.extract.fitfile import decode_fitfile
 
 from scipy import ndimage
 
 import pandas as pd
 from matplotlib import pyplot as plt
 
-SMOOTHING_SIGMA = 10
+SMOOTHING_SIGMA = 5
 
 
 class Workout:

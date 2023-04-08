@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 import pandas as pd
 
-from fit_etl import utils as u
+from fit_etl.tooling import utils as u
 
 
 class HeartRateDecreaseModel:
