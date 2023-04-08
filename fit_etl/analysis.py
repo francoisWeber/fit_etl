@@ -15,6 +15,7 @@ class HeartRateDecreaseModel:
         key_params=None,
         params_bounds=None,
         params_init=None,
+        use_smoothed_versions=False,
     ) -> None:
         self.params_names: Tuple[str] = params_names
         self.key_params = params_names if key_params is None else key_params
@@ -24,6 +25,7 @@ class HeartRateDecreaseModel:
         self.params_bounds: Tuple[List[float]] = params_bounds
         self.params_init: Tuple[float] = params_init
         self.params_estimated: List[float] = None
+        self.use_smoothed_versions = use_smoothed_versions
 
     @abstractmethod
     def extract_xy_from_df(df: pd.DataFrame):
@@ -64,11 +66,16 @@ class HeartRateDecreaseModel:
 class PiecewiseExpDecreaseModel(HeartRateDecreaseModel):
     """PiecewiseExpDecrease represent a 1st HR decrease model to be calibrated"""
 
-    def __init__(self) -> None:
+    def __init__(self, use_smoothed_versions=False) -> None:
         params_names = ("start_level", "t_start", "tau", "t_stop")
         name = "piecewise_exp"
         key_params = "tau"
-        super().__init__(params_names=params_names, name=name, key_params=key_params)
+        super().__init__(
+            use_smoothed_versions=use_smoothed_versions,
+            params_names=params_names,
+            name=name,
+            key_params=key_params,
+        )
 
     def estimate_bounds(self, target):
         n_pts = len(target)
@@ -109,11 +116,11 @@ class PiecewiseExpDecreaseModel(HeartRateDecreaseModel):
         )
         return piece_1 + piece_2 + piece_3
 
-    @staticmethod
-    def extract_xy_from_df(df: pd.DataFrame):
+    def extract_xy_from_df(self, df: pd.DataFrame):
         df = u.reset_time(df)
         time = df.index.to_numpy()
-        target = np.square(df.heart_rate.to_numpy())
+        target = "heart_rate_smoothed" if self.use_smoothed_versions else "heart_rate"
+        target = np.square(df[target].to_numpy())
         target = target - target.min()
         return time, target
 
@@ -121,11 +128,16 @@ class PiecewiseExpDecreaseModel(HeartRateDecreaseModel):
 class PiecewiseLinearDecreaseModel(HeartRateDecreaseModel):
     """PiecewiseExpDecrease represent a 1st HR decrease model to be calibrated"""
 
-    def __init__(self) -> None:
+    def __init__(self, use_smoothed_versions=False) -> None:
         params_names = ("start_level", "t_start", "alpha", "t_stop")
         name = "piecewise_lin"
         key_params = "alpha"
-        super().__init__(params_names=params_names, name=name, key_params=key_params)
+        super().__init__(
+            use_smoothed_versions=use_smoothed_versions,
+            params_names=params_names,
+            name=name,
+            key_params=key_params,
+        )
 
     def estimate_bounds(self, target):
         n_pts = len(target)
@@ -168,20 +180,20 @@ class PiecewiseLinearDecreaseModel(HeartRateDecreaseModel):
         )
         return piece_1 + piece_2 + piece_3
 
-    @staticmethod
-    def extract_xy_from_df(df: pd.DataFrame):
+    def extract_xy_from_df(self, df: pd.DataFrame):
         df = u.reset_time(df)
         time = df.index.to_numpy()
-        target = np.square(df.heart_rate.to_numpy())
+        target = "heart_rate_smoothed" if self.use_smoothed_versions else "heart_rate"
+        target = np.square(df[target].to_numpy())
         target = target - target.min()
         return time, target
 
 
 class BreakAnalyzer:
-    def __init__(self) -> None:
+    def __init__(self, use_smoothed_versions=True) -> None:
         self.hr_decrease_models: List[HeartRateDecreaseModel] = [
-            PiecewiseLinearDecreaseModel(),
-            PiecewiseExpDecreaseModel(),
+            PiecewiseLinearDecreaseModel(use_smoothed_versions=use_smoothed_versions),
+            PiecewiseExpDecreaseModel(use_smoothed_versions=use_smoothed_versions),
         ]
 
     def fit(self, df: pd.DataFrame):
