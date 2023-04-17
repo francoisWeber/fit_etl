@@ -8,8 +8,6 @@ from scipy import ndimage
 import pandas as pd
 from matplotlib import pyplot as plt
 
-SMOOTHING_SIGMA = 5
-
 
 class Workout:
     def __init__(
