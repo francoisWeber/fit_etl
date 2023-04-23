@@ -7,6 +7,9 @@ from scipy import ndimage
 
 import pandas as pd
 from matplotlib import pyplot as plt
+import warnings
+
+warnings.filterwarnings("ignore", module="fitdecode")
 
 
 class Workout:
@@ -57,11 +60,12 @@ class Workout:
         hr_key = "heart_rate" + ("_smoothed" if use_smoothed_version else "")
         speed_key = "speed" + ("_smoothed" if use_smoothed_version else "")
         self.records.plot(y=hr_key, c="r", ax=ax)
-        ax_twin = ax.twinx()
-        self.records.plot(y=speed_key, c="b", ax=ax_twin)
+        ax.legend(loc="upper left")
+        self.records.plot(y=speed_key, c="b", ax=ax, secondary_y=True)
         for start_time in self.laps.start_time:
             ax.axvline(x=start_time, linestyle="--", c="k")
         ax.set_title(f"Basics for {self.date}")
+        return fig
 
     def get_every_breaks(self) -> List[pd.DataFrame]:
         n_breaks = len(self.laps[self.laps.category == LAP_CATEGORY_BREAK])
