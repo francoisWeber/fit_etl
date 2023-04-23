@@ -9,6 +9,8 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import warnings
 
+import seaborn as sns
+
 warnings.filterwarnings("ignore", module="fitdecode")
 
 
@@ -29,12 +31,42 @@ class Workout:
         self.enhance_data()
 
     def enhance_data(self):
-        self.records["heart_rate_smoothed"] = ndimage.gaussian_filter1d(
-            self.records.heart_rate, SMOOTHING_SIGMA
-        )
-        self.records["speed_smoothed"] = ndimage.gaussian_filter1d(
-            self.records.speed, SMOOTHING_SIGMA
-        )
+        # adding new quantities
+        if "mps_per_bpm" not in self.records:
+            self.records["mps_per_bpm"] = (
+                self.records.speed * 1000 / 3600 / self.records.heart_rate
+            )
+
+        if "joules_per_bpm" not in self.records:
+            self.records["joules_per_bpm"] = (
+                0.5
+                * BODY_MASS
+                * (self.records.speed * 1000 / 3600) ** 2
+                / self.records.heart_rate
+            )
+
+        # smooting some data
+        for raw_key in ["heart_rate", "speed", "mps_per_bpm", "joules_per_bpm"]:
+            smoothed_key = raw_key + "_smoothed"
+            if smoothed_key not in self.records:
+                self.records[smoothed_key] = ndimage.gaussian_filter1d(
+                    self.records[raw_key], SMOOTHING_SIGMA
+                )
+
+        # naming laps
+        if "lap_type" not in self.records:
+            type2count = {}
+            laps_names = []
+            for lap_type in self.laps.category:
+                type2count[lap_type] = type2count.get(lap_type, 0) + 1
+                laps_names.append(f"{lap_type}-{type2count[lap_type]}")
+            self.laps["lap_name"] = laps_names
+            # report them on records
+            ts = pd.to_datetime(self.records.timestamp)
+            self.records["lap_type"] = None
+            for _, lap in self.laps.iterrows():
+                index = ts.between(lap.start_time, lap.stop_time)
+                self.records.loc[index, "lap_type"] = lap.lap_name
 
     @classmethod
     def from_dataframe(clf, df: pd.DataFrame, path=None):
