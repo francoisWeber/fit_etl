@@ -86,18 +86,30 @@ class Workout:
         df = pd.DataFrame(decode_fitfile(path_or_buf))
         return Workout.from_dataframe(df, path_or_buf)
 
+    def plot(self, y1: str, y2: str = None, ax=None, figsize=(15, 5), title=None):
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        self.records.plot(y=y1, c="r", ax=ax)
+        ax.legend(loc="upper left")
+        if y2:
+            self.records.plot(y=y2, c="b", ax=ax, secondary_y=True)
+        for start_time in self.laps.start_time:
+            ax.axvline(x=start_time, linestyle="--", c="k")
+        if title is None:
+            title = y1
+            title += f" and {y2}" if y2 else ""
+            title += f" for {self.date}"
+        ax.set_title(title)
+        return ax.figure
+
     def plot_basics(self, ax=None, figsize=(15, 5), use_smoothed_version=True):
         if ax is None:
             fig, ax = plt.subplots(figsize=figsize)
         hr_key = "heart_rate" + ("_smoothed" if use_smoothed_version else "")
         speed_key = "speed" + ("_smoothed" if use_smoothed_version else "")
-        self.records.plot(y=hr_key, c="r", ax=ax)
-        ax.legend(loc="upper left")
-        self.records.plot(y=speed_key, c="b", ax=ax, secondary_y=True)
-        for start_time in self.laps.start_time:
-            ax.axvline(x=start_time, linestyle="--", c="k")
-        ax.set_title(f"Basics for {self.date}")
-        return fig
+        return self.plot(
+            hr_key, speed_key, ax=ax, figsize=figsize, title=f"Basics for {self.date}"
+        )
 
     def get_every_breaks(self) -> List[pd.DataFrame]:
         n_breaks = len(self.laps[self.laps.category == LAP_CATEGORY_BREAK])
