@@ -2,6 +2,7 @@ from typing import List
 from fit_etl.tooling.constants import *
 from fit_etl.extract.fidata import FitDataFrame
 from fit_etl.extract.fitfile import decode_fitfile
+from fit_etl.analysis import BreakAnalyzer
 
 from scipy import ndimage
 
@@ -57,16 +58,21 @@ class Workout:
         if "lap_type" not in self.records:
             type2count = {}
             laps_names = []
+            laps_ids_among_cat = []
             for lap_type in self.laps.category:
                 type2count[lap_type] = type2count.get(lap_type, 0) + 1
+                laps_ids_among_cat.append(type2count[lap_type])
                 laps_names.append(f"{lap_type}-{type2count[lap_type]}")
-            self.laps["lap_name"] = laps_names
+            self.laps["name"] = laps_names
+            self.laps["id_among_cat"] = laps_ids_among_cat
             # report them on records
             ts = pd.to_datetime(self.records.timestamp)
             self.records["lap_type"] = None
             for _, lap in self.laps.iterrows():
                 index = ts.between(lap.start_time, lap.stop_time)
-                self.records.loc[index, "lap_type"] = lap.lap_name
+                self.records.loc[index, "lap_category"] = lap.category
+                self.records.loc[index, "lap_name"] = lap.name
+                self.records.loc[index, "lap_id_among_cat"] = lap.id_among_cat
 
     @classmethod
     def from_dataframe(clf, df: pd.DataFrame, path=None):
@@ -117,6 +123,11 @@ class Workout:
             self.get_ith_lap_of_category(i, LAP_CATEGORY_BREAK) for i in range(n_breaks)
         ]
 
+    def lap2records(self, start_time, stop_time, **kwargs):
+        return self.records.between_time(
+            start_time=start_time.time(), end_time=stop_time.time()
+        )
+
     def get_ith_lap_of_category(self, i, category):
         try:
             laps = self.laps[self.laps.category == category]
@@ -129,3 +140,9 @@ class Workout:
         return self.records.between_time(
             start_time=lap.start_time.time(), end_time=lap.stop_time.time()
         )
+
+    # def enhance_laps_info(self):
+    #     break_analyzer = BreakAnalyzer()
+    #     for break_lap in self.laps[self.laps.category == "break"]:
+    #         break_analyzer.fit(break_lap)
+    #         break_analyzer.get_key_params_as_columns()

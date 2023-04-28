@@ -7,29 +7,36 @@ import pandas as pd
 from fit_etl.tooling import utils as u
 
 
-class HeartRateDecreaseModel:
+class AnalysisModel:
     def __init__(
         self,
+        needed_feature: str,
         params_names,
         name,
-        key_params=None,
+        key_params,
         params_bounds=None,
         params_init=None,
-        use_smoothed_versions=False,
+        do_square_target=False,
     ) -> None:
+        self.needed_feature = needed_feature
         self.params_names: Tuple[str] = params_names
-        self.key_params = params_names if key_params is None else key_params
+        self.key_params = key_params
         if not isinstance(self.key_params, list):
             self.key_params = [self.key_params]
         self.name: str = name
         self.params_bounds: Tuple[List[float]] = params_bounds
         self.params_init: Tuple[float] = params_init
         self.params_estimated: List[float] = None
-        self.use_smoothed_versions = use_smoothed_versions
+        self.do_square_target = do_square_target
 
-    @abstractmethod
-    def extract_xy_from_df(df: pd.DataFrame):
-        ...
+    def extract_xy_from_df(self, df: pd.DataFrame):
+        df = u.reset_time(df)
+        time = df.index.to_numpy()
+        target = df[self.needed_feature].to_numpy()
+        if self.do_square_target:
+            target = np.square(target)
+        target = target - target.min()
+        return time, target
 
     @abstractmethod
     def estimate_bounds(target):
@@ -62,19 +69,26 @@ class HeartRateDecreaseModel:
         )
         self.params_estimated = params_estimated
 
+    def get_description(self):
+        descr = f"{self.name} on "
+        descr += "sqared " if self.do_square_target else " "
+        descr += self.needed_feature
+        return descr
 
-class PiecewiseExpDecreaseModel(HeartRateDecreaseModel):
+
+class PiecewiseExpDecreaseModel(AnalysisModel):
     """PiecewiseExpDecrease represent a 1st HR decrease model to be calibrated"""
 
-    def __init__(self, use_smoothed_versions=False) -> None:
+    def __init__(self, needed_feature: str, do_square_target=False) -> None:
         params_names = ("start_level", "t_start", "tau", "t_stop")
         name = "piecewise_exp"
         key_params = "tau"
         super().__init__(
-            use_smoothed_versions=use_smoothed_versions,
             params_names=params_names,
             name=name,
             key_params=key_params,
+            needed_feature=needed_feature,
+            do_square_target=do_square_target,
         )
 
     def estimate_bounds(self, target):
@@ -116,24 +130,17 @@ class PiecewiseExpDecreaseModel(HeartRateDecreaseModel):
         )
         return piece_1 + piece_2 + piece_3
 
-    def extract_xy_from_df(self, df: pd.DataFrame):
-        df = u.reset_time(df)
-        time = df.index.to_numpy()
-        target = "heart_rate_smoothed" if self.use_smoothed_versions else "heart_rate"
-        target = np.square(df[target].to_numpy())
-        target = target - target.min()
-        return time, target
 
-
-class PiecewiseLinearDecreaseModel(HeartRateDecreaseModel):
+class PiecewiseLinearDecreaseModel(AnalysisModel):
     """PiecewiseExpDecrease represent a 1st HR decrease model to be calibrated"""
 
-    def __init__(self, use_smoothed_versions=False) -> None:
+    def __init__(self, needed_feature: str, do_square_target=False) -> None:
         params_names = ("start_level", "t_start", "alpha", "t_stop")
         name = "piecewise_lin"
         key_params = "alpha"
         super().__init__(
-            use_smoothed_versions=use_smoothed_versions,
+            needed_feature=needed_feature,
+            do_square_target=do_square_target,
             params_names=params_names,
             name=name,
             key_params=key_params,
@@ -180,35 +187,67 @@ class PiecewiseLinearDecreaseModel(HeartRateDecreaseModel):
         )
         return piece_1 + piece_2 + piece_3
 
-    def extract_xy_from_df(self, df: pd.DataFrame):
-        df = u.reset_time(df)
-        time = df.index.to_numpy()
-        target = "heart_rate_smoothed" if self.use_smoothed_versions else "heart_rate"
-        target = np.square(df[target].to_numpy())
-        target = target - target.min()
-        return time, target
-
 
 class BreakAnalyzer:
-    def __init__(self, use_smoothed_versions=True) -> None:
-        self.hr_decrease_models: List[HeartRateDecreaseModel] = [
-            PiecewiseLinearDecreaseModel(use_smoothed_versions=use_smoothed_versions),
-            PiecewiseExpDecreaseModel(use_smoothed_versions=use_smoothed_versions),
+    def __init__(self) -> None:
+        self.models: List[AnalysisModel] = [
+            PiecewiseLinearDecreaseModel(
+                needed_feature="heart_rate_smoothed", do_square_target=True
+            ),
+            PiecewiseExpDecreaseModel(
+                needed_feature="heart_rate_smoothed", do_square_target=True
+            ),
+            PiecewiseLinearDecreaseModel(needed_feature="joules_per_bpm_smoothed"),
+            PiecewiseExpDecreaseModel(needed_feature="joules_per_bpm_smoothed"),
         ]
 
     def fit(self, df: pd.DataFrame):
-        for model in self.hr_decrease_models:
+        for model in self.models:
             model.fit(df)
 
     def get_params(self):
-        return {model.name: model.get_params() for model in self.hr_decrease_models}
+        params = []
+        for model in self.models:
+            for name, value in model.get_params().items():
+                params.append(
+                    {
+                        "input_feature": model.needed_feature,
+                        "model_name": model.name,
+                        "squared": model.do_square_target,
+                        "param_name": name,
+                        "param_value": value,
+                    }
+                )
+        return params
 
     def get_key_params(self):
-        return {model.name: model.get_key_params() for model in self.hr_decrease_models}
+        params = []
+        for model in self.models:
+            for name, value in model.get_key_params().items():
+                params.append(
+                    {
+                        "input_feature": model.needed_feature,
+                        "model_name": model.name,
+                        "squared": model.do_square_target,
+                        "param_name": name,
+                        "param_value": value,
+                    }
+                )
+        return params
+
+    def get_key_params_as_columns(self):
+        params = {}
+        for model in self.models:
+            model_str = ["squared_" if model.do_square_target else ""]
+            model_str += [model.needed_feature, model.name]
+            for name, value in model.get_key_params().items():
+                model_name = "_".join(model_str + [name])
+                params[model_name] = value
+        return params
 
     def predict(self, time):
         predictions = {}
-        for model in self.hr_decrease_models:
+        for model in self.models:
             params = model.get_params().values()
             predictor = lambda t: model(t, *params)
             predictions[model.name] = predictor(time)
